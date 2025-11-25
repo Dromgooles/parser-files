@@ -1,5 +1,4 @@
 """
-v1.0.0
 Main parser element for invoice PDF documents
 """
 

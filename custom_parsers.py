@@ -1,5 +1,4 @@
 """
-v2.2.3
 Custom invoice parsers for specific vendors.
 
 This module contains specialized parsing logic for invoice formats that
@@ -3548,7 +3547,7 @@ def parse_with_custom_parser(
 
     if vendor and vendor in CUSTOM_PARSERS:
         parser_class = CUSTOM_PARSERS[vendor]
-        # print(f"Using {vendor.replace('_', ' ').title()} custom parser")
+        print(f"Using {vendor.replace('_', ' ').title()} custom parser with new version")
         return parser_class.parse(pdf_path, include_zero_qty)
 
     return []

@@ -1,14 +1,14 @@
 {
-  "version": "1.0.0",
-  "updated": "2025-11-25T17:06:50Z",
+  "version": "1.0.1",
+  "updated": "2025-11-25T17:28:10Z",
   "files": {
     "parse.py": {
-      "sha256": "6db2b62ca7315201f9e4afc78fcf1eb374c0c698bca3baa28222fa40dc561327",
-      "size": 20755
+      "sha256": "141ff4d79e6f86a9d59e6db92c41f78db8edce27288c697eb923348ed03b2902",
+      "size": 20748
     },
     "custom_parsers.py": {
-      "sha256": "42215423a1390296998d9b3acc5904bd3462c72ac3ae18fa5a6da6644d4f2f14",
-      "size": 157337
+      "sha256": "a057420623f5226698b7b0baa98b1891ad6c06741cd815c7746f771391b13932",
+      "size": 157345
     }
   },
   "minAppVersion": "1.0.0"
