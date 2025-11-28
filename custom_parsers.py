@@ -2933,7 +2933,7 @@ class JPTParser:
                                 if item["quantity"] == 0 and not include_zero_qty:
                                     continue
                                 items.append(item)
-                        except Exception:
+                        except (ValueError, IndexError, AttributeError):
                             # Skip unparseable lines
                             continue
 
@@ -3083,7 +3083,7 @@ class JPTParser:
                                     backorder_item = item.copy()
                                     backorder_item["backorder_quantity"] = int(bo_str)
                                     backorder_items.append(backorder_item)
-                        except Exception:
+                        except (ValueError, IndexError, AttributeError):
                             continue
 
         return regular_items, backorder_items
@@ -3393,7 +3393,7 @@ class BenchmadeParser:
                             }
                         except ValueError:
                             pending_item = None
-                    elif pending_item:
+                    elif pending_item is not None:
                         # This is a continuation line for the description
                         # Make sure it's not shipping info or footer
                         if not re.match(
@@ -3473,11 +3473,7 @@ class UnibrandsParser:
                         continue
 
                     # Skip non-item lines
-                    if (
-                        not line
-                        or "All prices are in USD" in line
-                        or "Page " in line
-                    ):
+                    if not line or "All prices are in USD" in line or "Page " in line:
                         i += 1
                         continue
 

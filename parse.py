@@ -2,11 +2,16 @@
 Main parser element for invoice PDF documents
 """
 
-from pathlib import Path
-from typing import List, Optional
-import re
-import warnings
+import json
 import logging
+from pathlib import Path
+import re
+import sys
+from typing import List, Optional
+import warnings
+
+import pdfplumber
+from custom_parsers import parse_with_custom_parser, detect_vendor
 
 # Suppress Pillow warnings about invalid ICC profiles
 warnings.filterwarnings("ignore", message=".*Invalid profile.*")
@@ -14,11 +19,6 @@ warnings.filterwarnings("ignore", category=UserWarning, module="PIL")
 
 # Suppress logging noise from pdfminer
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
-
-import pdfplumber
-
-# Import custom parsers
-from custom_parsers import parse_with_custom_parser
 
 
 def decode_cid_references(text: str) -> str:
@@ -547,9 +547,6 @@ def main():
         ]
     }
     """
-    import sys
-    import json
-    from custom_parsers import detect_vendor
 
     if len(sys.argv) != 3:
         print("Usage: parse.py <pdf_path> <output_json>", file=sys.stderr)
@@ -568,7 +565,7 @@ def main():
                     detected = detect_vendor(text)
                     if detected:
                         vendor = detected
-        except Exception as e:
+        except (OSError, ValueError, KeyError, AttributeError) as e:
             print(f"Warning: Could not detect vendor: {e}", file=sys.stderr)
 
         # Parse invoice
@@ -588,10 +585,10 @@ def main():
         }
 
         # Write results as JSON
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2)
 
-    except Exception as e:
+    except (FileNotFoundError, OSError, ValueError, KeyError) as e:
         # Write error response
         error_result = {
             "success": False,
@@ -599,7 +596,7 @@ def main():
             "error_type": type(e).__name__,
         }
 
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(error_result, f, indent=2)
 
         print(f"Error parsing invoice: {e}", file=sys.stderr)
