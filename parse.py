@@ -9,11 +9,11 @@ import warnings
 import logging
 
 # Suppress Pillow warnings about invalid ICC profiles
-warnings.filterwarnings('ignore', message='.*Invalid profile.*')
-warnings.filterwarnings('ignore', category=UserWarning, module='PIL')
+warnings.filterwarnings("ignore", message=".*Invalid profile.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="PIL")
 
 # Suppress logging noise from pdfminer
-logging.getLogger('pdfminer').setLevel(logging.ERROR)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 import pdfplumber
 
@@ -495,7 +495,15 @@ def convert_to_table_format(line_items: List[dict]) -> List[List[str]]:
         return []
 
     # Define headers
-    headers = ["Quantity", "Backorder", "Item Number", "SKU", "Description", "Unit Price", "Total"]
+    headers = [
+        "Quantity",
+        "Backorder",
+        "Item Number",
+        "SKU",
+        "Description",
+        "Unit Price",
+        "Total",
+    ]
 
     # Convert each item to a row
     rows = [headers]

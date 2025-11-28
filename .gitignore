@@ -1,0 +1,7 @@
+test_assets/
+
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/

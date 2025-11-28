@@ -976,7 +976,9 @@ class ColesParser:
                                 item_num = item_list[i] if i < len(item_list) else ""
                                 description = desc_list[i] if i < len(desc_list) else ""
                                 backorder = (
-                                    int(backorder_list[i]) if i < len(backorder_list) else 0
+                                    int(backorder_list[i])
+                                    if i < len(backorder_list)
+                                    else 0
                                 )
 
                                 price = (
@@ -1069,9 +1071,13 @@ class LamyParser:
                             )
 
                             if match:
-                                qty_str, backorder_str, item_code, price_str, amount_str = (
-                                    match.groups()
-                                )
+                                (
+                                    qty_str,
+                                    backorder_str,
+                                    item_code,
+                                    price_str,
+                                    amount_str,
+                                ) = match.groups()
                                 description = (
                                     lines[i + 1].strip() if i + 1 < len(lines) else ""
                                 )
@@ -1857,7 +1863,7 @@ class KenroParser:
                             is_spaced_item_code = re.search(r"(?:\w\s){3,}", item_code)
                             is_spaced_desc = re.search(r"(?:\w\s){3,}", description)
                             is_spaced_qty = re.search(r"\d\s+\d", qty_str)
-                            
+
                             # De-space if needed
                             if is_spaced_item_code:
                                 item_code = despace_sku(item_code)
@@ -1884,25 +1890,33 @@ class KenroParser:
                             for offset in [1, 2]:
                                 if i + offset >= len(table):
                                     break
-                                
+
                                 next_row = table[i + offset]
                                 if not next_row or len(next_row) <= 1:
                                     break
-                                
-                                next_item_code = str(next_row[0]).strip() if next_row[0] else ""
-                                next_desc = str(next_row[1]).strip() if next_row[1] else ""
-                                next_qty = str(next_row[3]).strip() if len(next_row) > 3 and next_row[3] else ""
-                                
+
+                                next_item_code = (
+                                    str(next_row[0]).strip() if next_row[0] else ""
+                                )
+                                next_desc = (
+                                    str(next_row[1]).strip() if next_row[1] else ""
+                                )
+                                next_qty = (
+                                    str(next_row[3]).strip()
+                                    if len(next_row) > 3 and next_row[3]
+                                    else ""
+                                )
+
                                 # If next row has an item code or quantity, it's a new item - stop
                                 if next_item_code or (next_qty and next_qty.isdigit()):
                                     break
-                                
+
                                 # If next row has description, it's a continuation
                                 if next_desc:
                                     # De-space if needed
                                     if re.search(r"(?:\w\s){3,}", next_desc):
                                         next_desc = despace_and_format_desc(next_desc)
-                                    
+
                                     description += " " + next_desc
                                     continuation_rows += 1
 
@@ -1912,7 +1926,11 @@ class KenroParser:
                                 continue
 
                             price = float(price_str) if price_str else 0.0
-                            backorder = int(backorder_str) if backorder_str and backorder_str.isdigit() else 0
+                            backorder = (
+                                int(backorder_str)
+                                if backorder_str and backorder_str.isdigit()
+                                else 0
+                            )
                             amount = float(amount_str) if amount_str else 0.0
 
                             if item_code and description:
@@ -1927,7 +1945,7 @@ class KenroParser:
                                         "total_amount": amount,
                                     }
                                 )
-                            
+
                             # Skip past this item and its continuation rows
                             i += 1 + continuation_rows
                         except (ValueError, IndexError):
@@ -2003,7 +2021,7 @@ class PlotterParser:
                         matchB = re.match(
                             r"^(\d+)\s+x\s+([A-Z0-9]+)\s+(.+?)\s+\$?([\d,.]+)$", line
                         )
-                        
+
                         if matchB and next_line == "USD":
                             qty_str = matchB.group(1)
                             item_number = matchB.group(2)
@@ -2011,7 +2029,7 @@ class PlotterParser:
                             unit_price_str = matchB.group(4)
 
                             # Extract PLT code from description if present
-                            plt_match = re.search(r'(PLT\d+)', description)
+                            plt_match = re.search(r"(PLT\d+)", description)
                             sku = plt_match.group(1) if plt_match else item_number
 
                             try:
@@ -2071,7 +2089,7 @@ class PlotterParser:
                                 description = f"{description} ({size})"
 
                             # Extract PLT code from description if present
-                            plt_match = re.search(r'(PLT\d+)', description)
+                            plt_match = re.search(r"(PLT\d+)", description)
                             sku = plt_match.group(1) if plt_match else item_number
 
                             try:
@@ -2590,7 +2608,7 @@ class AmeicoParser:
                                     # The suffix should be a short word at the END (like color/variant)
                                     last_line = continuation_lines[-1].strip()
                                     words = last_line.split()
-                                    
+
                                     # Check if last line looks like an item code suffix:
                                     # - Short (1-2 words)
                                     # - Not a brand name or long description phrase
@@ -2601,7 +2619,8 @@ class AmeicoParser:
                                         and not last_line.startswith("Toyo")
                                         and not last_line.startswith("The ")
                                         and not last_line.startswith("with ")
-                                        and len(last_line) < 20  # Suffixes are typically short
+                                        and len(last_line)
+                                        < 20  # Suffixes are typically short
                                     ):
                                         # Complete the item code with the suffix
                                         item_code = item_code + last_line
@@ -3274,6 +3293,280 @@ class WearingeulParser:
         return items
 
 
+class BenchmadeParser:
+    """Parser for Benchmade invoices - text-based format with multi-line descriptions."""
+
+    @staticmethod
+    def parse(pdf_path: str, include_zero_qty: bool = True) -> List[dict]:
+        """
+        Extract line items from Benchmade invoice.
+
+        Format: STOCK_CODE DESCRIPTION QTY COUNTRY UNIT_PRICE DISCOUNT EXTENSION
+        Example: 945BK-1 OSBORNE, MINI OSBORNE, AXIS, 3 USA 112.50 0.00 337.50
+                 REVERSE TANTO
+
+        Challenges:
+        - Descriptions can span multiple lines
+        - Need to skip FREIGHT CHARGES line
+        - Data is in text format, not well-structured tables
+        """
+        items = []
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
+
+                lines = text.split("\n")
+                in_items = False
+                pending_item = None
+
+                for line in lines:
+                    line = line.strip()
+
+                    # Detect start of items section
+                    if "STOCK CODE" in line and "DESCRIPTION" in line:
+                        in_items = True
+                        continue
+
+                    # Detect end of items section
+                    if in_items and (
+                        "SUBTOTAL" in line
+                        or "CRYSTALW" in line
+                        or "SHP " in line
+                        or "REL " in line
+                        or "PACKS " in line
+                        or "LBS " in line
+                        or "VIA " in line
+                        or "TRKPR" in line
+                    ):
+                        # Save pending item if exists
+                        if pending_item:
+                            items.append(pending_item)
+                            pending_item = None
+                        break
+
+                    if not in_items or not line:
+                        continue
+
+                    # Skip FREIGHT CHARGES line
+                    if line.startswith("FREIGHT CHARGES"):
+                        continue
+
+                    # Try to parse as a new item line
+                    # Pattern: STOCK_CODE DESCRIPTION... QTY COUNTRY UNIT_PRICE DISCOUNT EXTENSION
+                    # Stock codes: alphanumeric with hyphens (e.g., 945BK-1, 940-04, 50080, 100604F)
+                    match = re.match(
+                        r"^([A-Z0-9]+-?[A-Z0-9]*)\s+(.+?)\s+(\d+)\s+(USA|[A-Z]{2,3})\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)$",
+                        line,
+                    )
+
+                    if match:
+                        # Save any pending item first
+                        if pending_item:
+                            items.append(pending_item)
+
+                        (
+                            stock_code,
+                            description,
+                            qty_str,
+                            country,
+                            unit_price_str,
+                            discount_str,
+                            extension_str,
+                        ) = match.groups()
+
+                        try:
+                            qty = int(qty_str)
+                            if qty == 0 and not include_zero_qty:
+                                pending_item = None
+                                continue
+
+                            pending_item = {
+                                "quantity": qty,
+                                "item_number": stock_code,
+                                "sku": stock_code,
+                                "product_description": description.strip(),
+                                "unit_price": float(unit_price_str.replace(",", "")),
+                                "total_amount": float(extension_str.replace(",", "")),
+                            }
+                        except ValueError:
+                            pending_item = None
+                    elif pending_item:
+                        # This is a continuation line for the description
+                        # Make sure it's not shipping info or footer
+                        if not re.match(
+                            r"^(SHP|REL|PACKS|LBS|VIA|TRKPR|CRYSTALW)", line
+                        ):
+                            pending_item["product_description"] += " " + line
+
+                # Save any remaining pending item
+                if pending_item:
+                    items.append(pending_item)
+                    pending_item = None
+
+        return items
+
+
+class UnibrandsParser:
+    """Parser for Unibrands/Nahvalur invoices - text-based format with multi-line descriptions."""
+
+    @staticmethod
+    def parse(pdf_path: str, include_zero_qty: bool = True) -> List[dict]:
+        """
+        Extract line items from Unibrands invoice.
+
+        Format: ACTIVITY SKU DESCRIPTION QTY RATE AMOUNT
+        Where ACTIVITY is the full product name and SKU is the item code.
+        The DESCRIPTION column often contains wrapped text from the product name.
+
+        Examples:
+        - Simple: Nahvalur Eclipse Cobalt Rose Gold Fine 09110111 5 39.60 198.00
+        - Multi-line: Nahvalur - Snake Pen of the Year 2025 Fine 03080051 Nahvalur - Snake 3 90.00 270.00
+                      Pen of the Year
+                      2025 Fine
+
+        Challenge: Some items have their description wrap across multiple lines.
+        Continuation pages may not have the header row.
+        """
+        items = []
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
+
+                lines = text.split("\n")
+                pending_item = None
+
+                i = 0
+                while i < len(lines):
+                    line = lines[i].strip()
+
+                    # Skip header line
+                    if "ACTIVITY" in line and "SKU" in line and "QTY" in line:
+                        i += 1
+                        continue
+
+                    # Detect end of items section
+                    if (
+                        "SUBTOTAL" in line
+                        or "Account Name:" in line
+                        or "BALANCE DUE" in line
+                        or "Account Type:" in line
+                        or "Bank Name:" in line
+                        or "SWIFT Code:" in line
+                        or "Account Number:" in line
+                        or "Wire Transfer" in line
+                        or "ACH Routing" in line
+                        or "All items are fountain pens" in line
+                        or "Pay invoice" in line
+                        or line.startswith("token=")
+                    ):
+                        # Save pending item if exists
+                        if pending_item:
+                            items.append(pending_item)
+                            pending_item = None
+                        i += 1
+                        continue
+
+                    # Skip non-item lines
+                    if (
+                        not line
+                        or "All prices are in USD" in line
+                        or "Page " in line
+                    ):
+                        i += 1
+                        continue
+
+                    # Try to parse as a new item line
+                    # Pattern: ACTIVITY_NAME SKU [WRAPPED_DESC] QTY RATE AMOUNT
+                    # SKUs are numeric (e.g., 09110111, 03080051, 1013002) - 7 or 8 digits
+                    # The line ends with: QTY RATE AMOUNT (all numeric with decimal for rate/amount)
+
+                    # Match lines that end with: numeric qty, decimal rate, decimal amount
+                    match = re.match(
+                        r"^(.+?)\s+(\d{7,8})\s*(.*?)\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)$",
+                        line,
+                    )
+
+                    if match:
+                        # Save any pending item first
+                        if pending_item:
+                            items.append(pending_item)
+
+                        (
+                            activity,
+                            sku,
+                            _wrapped_desc,
+                            qty_str,
+                            rate_str,
+                            amount_str,
+                        ) = match.groups()
+
+                        try:
+                            qty = int(qty_str)
+                            if qty == 0 and not include_zero_qty:
+                                pending_item = None
+                                i += 1
+                                continue
+
+                            # The activity column is the full product name
+                            description = activity.strip()
+
+                            pending_item = {
+                                "quantity": qty,
+                                "item_number": sku,
+                                "sku": sku,
+                                "product_description": description,
+                                "unit_price": float(rate_str.replace(",", "")),
+                                "total_amount": float(amount_str.replace(",", "")),
+                            }
+
+                            # If there's wrapped description text, it will continue on next lines
+                            # but we already have the full product name from ACTIVITY
+                            # so we just skip those continuation lines
+
+                            # Check if next lines are continuation (no pattern match)
+                            while i + 1 < len(lines):
+                                next_line = lines[i + 1].strip()
+                                # Skip if it's a continuation line (no full pattern match)
+                                next_match = re.match(
+                                    r"^(.+?)\s+(\d{7,8})\s*(.*?)\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)$",
+                                    next_line,
+                                )
+                                if next_match:
+                                    break  # Next line is a new item
+                                if (
+                                    not next_line
+                                    or "SUBTOTAL" in next_line
+                                    or "Account Name:" in next_line
+                                    or "All prices are in USD" in next_line
+                                    or "Page " in next_line
+                                    or "BALANCE DUE" in next_line
+                                    or "Account Type:" in next_line
+                                    or "Bank Name:" in next_line
+                                ):
+                                    break  # End of section
+                                # It's a continuation line (wrapped description), skip it
+                                # since we already have the full name from ACTIVITY
+                                i += 1
+
+                        except ValueError:
+                            pending_item = None
+
+                    i += 1
+
+                # Save any remaining pending item at end of page
+                if pending_item:
+                    items.append(pending_item)
+                    pending_item = None
+
+        return items
+
+
 class EliteAccessoriesParser:
     """Parser for Elite Accessories invoices - handles split columns across pages."""
 
@@ -3285,7 +3578,7 @@ class EliteAccessoriesParser:
         Format: QTY BO ITEMNO DESCRIPTION SIZE UNITPRICE LINETOTAL
         Challenge: LINETOTAL column wraps to next page due to Excel export width
         Invoice starts on page 3 (index 2)
-        
+
         Strategy:
         1. Use table extraction to preserve column structure
         2. Match tables across pages by looking for header patterns
@@ -3299,42 +3592,48 @@ class EliteAccessoriesParser:
                 return items
 
             print(f"[EliteAccessories] Total pages: {len(pdf.pages)}")
-            
+
             # Extract tables from all invoice pages
             for page_num in range(2, len(pdf.pages)):
                 page = pdf.pages[page_num]
-                
+
                 # Use table extraction with custom settings
-                tables = page.extract_tables(table_settings={
-                    "vertical_strategy": "lines",
-                    "horizontal_strategy": "lines",
-                    "explicit_vertical_lines": [],
-                    "explicit_horizontal_lines": [],
-                    "snap_tolerance": 3,
-                    "join_tolerance": 3,
-                    "edge_min_length": 3,
-                    "min_words_vertical": 3,
-                    "min_words_horizontal": 1,
-                })
-                
+                tables = page.extract_tables(
+                    table_settings={
+                        "vertical_strategy": "lines",
+                        "horizontal_strategy": "lines",
+                        "explicit_vertical_lines": [],
+                        "explicit_horizontal_lines": [],
+                        "snap_tolerance": 3,
+                        "join_tolerance": 3,
+                        "edge_min_length": 3,
+                        "min_words_vertical": 3,
+                        "min_words_horizontal": 1,
+                    }
+                )
+
                 if not tables:
                     print(f"[EliteAccessories] Page {page_num + 1}: No tables found")
                     continue
-                
+
                 for table_idx, table in enumerate(tables):
                     if not table or len(table) < 2:
                         continue
-                    
+
                     # Check if this is the items table by looking for header
                     header_row = table[0]
-                    header_str = ' '.join([str(cell or '').strip() for cell in header_row]).lower()
-                    
-                    if 'qty' not in header_str and 'item no' not in header_str:
+                    header_str = " ".join(
+                        [str(cell or "").strip() for cell in header_row]
+                    ).lower()
+
+                    if "qty" not in header_str and "item no" not in header_str:
                         continue
-                    
-                    print(f"[EliteAccessories] Page {page_num + 1}, Table {table_idx}: {len(table)} rows, {len(header_row)} columns")
+
+                    print(
+                        f"[EliteAccessories] Page {page_num + 1}, Table {table_idx}: {len(table)} rows, {len(header_row)} columns"
+                    )
                     print(f"  Header: {header_row}")
-                    
+
                     # Find column indices
                     qty_idx = None
                     bo_idx = None
@@ -3342,94 +3641,109 @@ class EliteAccessoriesParser:
                     desc_idx = None
                     size_idx = None
                     price_idx = None
-                    
+
                     for i, cell in enumerate(header_row):
-                        cell_str = str(cell or '').strip().lower()
-                        if 'qty' in cell_str:
+                        cell_str = str(cell or "").strip().lower()
+                        if "qty" in cell_str:
                             qty_idx = i
-                        elif 'bo' in cell_str or 'backorder' in cell_str:
+                        elif "bo" in cell_str or "backorder" in cell_str:
                             bo_idx = i
-                        elif 'item' in cell_str and 'no' in cell_str:
+                        elif "item" in cell_str and "no" in cell_str:
                             item_idx = i
-                        elif 'description' in cell_str:
+                        elif "description" in cell_str:
                             desc_idx = i
-                        elif 'size' in cell_str:
+                        elif "size" in cell_str:
                             size_idx = i
-                        elif 'price' in cell_str and 'unit' in cell_str:
+                        elif "price" in cell_str and "unit" in cell_str:
                             price_idx = i
-                    
-                    print(f"  Column indices: qty={qty_idx}, bo={bo_idx}, item={item_idx}, desc={desc_idx}, size={size_idx}, price={price_idx}")
-                    
+
+                    print(
+                        f"  Column indices: qty={qty_idx}, bo={bo_idx}, item={item_idx}, desc={desc_idx}, size={size_idx}, price={price_idx}"
+                    )
+
                     # Parse data rows
                     for row_idx, row in enumerate(table[1:], start=1):
                         if not row or len(row) == 0:
                             continue
-                        
+
                         # Skip rows that don't have quantity
                         if qty_idx is None or qty_idx >= len(row):
                             continue
-                        
-                        qty_cell = str(row[qty_idx] or '').strip()
+
+                        qty_cell = str(row[qty_idx] or "").strip()
                         if not qty_cell or not qty_cell.isdigit():
                             continue
-                        
+
                         try:
                             qty = int(qty_cell)
                             if qty == 0 and not include_zero_qty:
                                 continue
-                            
+
                             # Extract other fields
                             bo = 0
                             if bo_idx is not None and bo_idx < len(row):
-                                bo_cell = str(row[bo_idx] or '').strip()
+                                bo_cell = str(row[bo_idx] or "").strip()
                                 if bo_cell.isdigit():
                                     bo = int(bo_cell)
-                            
-                            item_no = ''
+
+                            item_no = ""
                             if item_idx is not None and item_idx < len(row):
-                                item_no = str(row[item_idx] or '').strip()
-                            
-                            description = ''
+                                item_no = str(row[item_idx] or "").strip()
+
+                            description = ""
                             if desc_idx is not None and desc_idx < len(row):
-                                description = str(row[desc_idx] or '').strip()
-                            
-                            size = ''
+                                description = str(row[desc_idx] or "").strip()
+
+                            size = ""
                             if size_idx is not None and size_idx < len(row):
-                                size = str(row[size_idx] or '').strip()
-                            
+                                size = str(row[size_idx] or "").strip()
+
                             unit_price = 0.0
                             if price_idx is not None and price_idx < len(row):
-                                price_cell = str(row[price_idx] or '').replace('$', '').replace(',', '').strip()
+                                price_cell = (
+                                    str(row[price_idx] or "")
+                                    .replace("$", "")
+                                    .replace(",", "")
+                                    .strip()
+                                )
                                 if price_cell:
                                     unit_price = float(price_cell)
-                            
+
                             # Build product description
                             desc_parts = []
                             if description:
                                 desc_parts.append(description)
                             if size:
                                 desc_parts.append(size)
-                            product_desc = ' '.join(desc_parts) if desc_parts else item_no
-                            
-                            items.append({
-                                'quantity': qty,
-                                'backorder': bo,
-                                'item_number': item_no,
-                                'sku': item_no,
-                                'product_description': product_desc,
-                                'unit_price': unit_price,
-                                'total_amount': round(qty * unit_price, 2)
-                            })
-                            
+                            product_desc = (
+                                " ".join(desc_parts) if desc_parts else item_no
+                            )
+
+                            items.append(
+                                {
+                                    "quantity": qty,
+                                    "backorder": bo,
+                                    "item_number": item_no,
+                                    "sku": item_no,
+                                    "product_description": product_desc,
+                                    "unit_price": unit_price,
+                                    "total_amount": round(qty * unit_price, 2),
+                                }
+                            )
+
                             if len(items) <= 5:
-                                print(f"[EliteAccessories] Parsed: qty={qty}, bo={bo}, item={item_no}, desc='{product_desc}', price={unit_price}")
-                        
+                                print(
+                                    f"[EliteAccessories] Parsed: qty={qty}, bo={bo}, item={item_no}, desc='{product_desc}', price={unit_price}"
+                                )
+
                         except (ValueError, IndexError) as e:
-                            print(f"[EliteAccessories] Error parsing row {row_idx}: {e}")
+                            print(
+                                f"[EliteAccessories] Error parsing row {row_idx}: {e}"
+                            )
                             continue
 
             print(f"[EliteAccessories] Extracted {len(items)} items")
-            
+
         return items
 
 
@@ -3458,6 +3772,8 @@ CUSTOM_PARSERS = {
     "jpt": JPTParser,
     "wearingeul": WearingeulParser,
     "elite_accessories": EliteAccessoriesParser,
+    "benchmade": BenchmadeParser,
+    "unibrands": UnibrandsParser,
 }
 
 
@@ -3517,6 +3833,10 @@ def detect_vendor(text: str) -> str:
         return "wearingeul"
     elif "Elite Accessories" in text or "ELITE ACCESSORIES" in text:
         return "elite_accessories"
+    elif "Benchmade" in text or "BENCHMADE" in text:
+        return "benchmade"
+    elif "Unibrands Corporation" in text or "Nahvalur" in text:
+        return "unibrands"
 
     return ""
 
@@ -3547,7 +3867,9 @@ def parse_with_custom_parser(
 
     if vendor and vendor in CUSTOM_PARSERS:
         parser_class = CUSTOM_PARSERS[vendor]
-        print(f"Using {vendor.replace('_', ' ').title()} custom parser with new version")
+        print(
+            f"Using {vendor.replace('_', ' ').title()} custom parser with new version"
+        )
         return parser_class.parse(pdf_path, include_zero_qty)
 
     return []
